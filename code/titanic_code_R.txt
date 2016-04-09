@@ -1,0 +1,170 @@
+train <- read.csv("train.csv", stringsAsFactors=FALSE)// read the table
+table(train$Survived)
+prop.table(table(train$Survived))
+test$Survived <- rep(0, 418) //add a column
+summary(train$Sex)
+prop.table(table(train$Sex, train$Survived))
+prop.table(table(train$Sex, train$Survived),1) // indicate by line
+test$Survived <- 0
+test$Survived[test$Sex == 'female'] <- 1 //assume female are all survive
+summary(train$Age)
+train$Child <- 0
+train$Child[train$Age < 18] <- 1//assume children under 18 are all survive
+aggregate(Survived ~ Child + Sex, data=train, FUN=sum)
+aggregate(Survived ~ Child + Sex, data=train, FUN=length)
+aggregate(Survived ~ Child + Sex, data=train, FUN=function(x) {sum(x)/length(x)})
+train$Fare2 <- '30+'
+train$Fare2[train$Fare < 30 & train$Fare >= 20] <- '20-30'
+train$Fare2[train$Fare < 20 & train$Fare >= 10] <- '10-20'
+train$Fare2[train$Fare < 10] <- '<10'
+aggregate(Survived ~ Fare2 + Pclass + Sex, data=train, FUN=function(x) {sum(x)/length(x)})
+
+library(rpart)
+fit <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, data=train, method="class")
+plot(fit)
+text(fit)
+install.packages('rattle')// install package
+install.packages('rpart.plot')
+install.packages('RColorBrewer')
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+fancyRpartPlot(fit) 
+Prediction <- predict(fit, test, type = "class") //use predict function
+
+fancyRpartPlot(fit)
+
+fit <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, data=train,
+             method="class", control=rpart.control( your controls ))
+new.fit <- prp(fit,snip=TRUE)$obj
+fancyRpartPlot(new.fit)
+
+
+train$Name[1]
+
+test$Survived <- NA
+combi <- rbind(train, test) //combine two table
+
+combi$Name <- as.character(combi$Name) //change factor into string
+combi$Name[1]
+
+strsplit(combi$Name[1], split='[,.]') //split up
+[[1]]
+
+strsplit(combi$Name[1], split='[,.]')[[1]]
+
+strsplit(combi$Name[1], split='[,.]')[[1]][2] 
+
+combi$Title <- sapply(combi$Name, FUN=function(x) {strsplit(x, split='[,.]')[[1]][2]}) //get title of each line
+
+combi$Title <- sub(' ', '', combi$Title)
+
+table(combi$Title)
+
+combi$Title[combi$Title %in% c('Mme', 'Mlle')] <- 'Mlle' //combine two part since they don’t appear often
+
+combi$Title[combi$Title %in% c('Capt', 'Don', 'Major', 'Sir')] <- 'Sir'
+combi$Title[combi$Title %in% c('Dona', 'Lady', 'the Countess', 'Jonkheer')] <- 'Lady'
+
+combi$Title <- factor(combi$Title) //change into factor
+
+combi$FamilySize <- combi$SibSp + combi$Parch + 1 //1 represent herself/himself
+
+combi$Surname <- sapply(combi$Name, FUN=function(x) {strsplit(x, split='[,.]')[[1]][1]}) 
+
+combi$FamilyID <- paste(as.character(combi$FamilySize), combi$Surname, sep="") //combine size and name and create a new column
+
+combi$FamilyID[combi$FamilySize <= 2] <- 'Small'
+
+table(combi$FamilyID)
+
+famIDs <- data.frame(table(combi$FamilyID))
+
+famIDs <- famIDs[famIDs$Freq <= 2,]
+
+combi$FamilyID[combi$FamilyID %in% famIDs$Var1] <- 'Small' //The %in% operator checks to see if a value is part of the 	                                                             vector we’re comparing it to. 
+combi$FamilyID <- factor(combi$FamilyID)
+
+train <- combi[1:891,]
+test <- combi[892:1309,]
+
+fit <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked + Title + FamilySize + FamilyID,
+data=train, method="class")
+
+sample(1:10, replace = TRUE)
+
+summary(combi$Age)
+
+Agefit <- rpart(Age ~ Pclass + Sex + SibSp + Parch + Fare + Embarked + Title + FamilySize,
+                data=combi[!is.na(combi$Age),], method="anova")
+combi$Age[is.na(combi$Age)] <- predict(Agefit, combi[is.na(combi$Age),]) //we can use the R function is.na(), and it’s reciprocal !is.na() (the bang symbol represents ‘not’). This subsets on whether a value is missing or not. We now also want to use the method=”anova” version of our decision tree, as we are not trying to predict a category any more, but a continuous variable.
+
+summary(combi)
+
+summary(combi$Embarked)
+
+which(combi$Embarked == '') //find NA
+
+combi$Embarked[c(62,830)] = "S"
+combi$Embarked <- factor(combi$Embarked) //把change into factor
+
+summary(combi$Fare)
+
+which(is.na(combi$Fare))
+
+combi$Fare[1044] <- median(combi$Fare, na.rm=TRUE)
+
+combi$FamilyID2 <- combi$FamilyID
+combi$FamilyID2 <- as.character(combi$FamilyID2)  // change into string
+combi$FamilyID2[combi$FamilySize <= 3] <- 'Small'
+combi$FamilyID2 <- factor(combi$FamilyID2) //change into factor
+
+install.packages('randomForest')
+
+library(randomForest)
+
+set.seed(415)
+
+fit <- randomForest(as.factor(Survived) ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked + Title + FamilySize +
+ FamilyID2, data=train, importance=TRUE, ntree=2000)// in this part we change a lot of parameters
+
+varImpPlot(fit)
+
+Prediction <- predict(fit, test)
+submit <- data.frame(PassengerId = test$PassengerId, Survived = Prediction)
+
+install.packages('party')
+
+library(party)
+set.seed(415)
+fit <- cforest(as.factor(Survived) ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked + Title + FamilySize + FamilyID+Cabin_1, data = train, controls=cforest_unbiased(ntree=2000, mtry=3)// this is the final one. We use all of those parameters to make the prediction.
+
+Prediction <- predict(fit, test, OOB=TRUE, type = "response")
+
+submit <- data.frame(PassengerId = test$PassengerId, Survived = Prediction)
+write.csv(submit, file = "mysecondforest.csv", row.names = FALSE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
